@@ -5,3 +5,5 @@ config/.env
 .venv/
 .idea/
 trash/
+__pycache__/
+logs/
