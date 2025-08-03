@@ -1,0 +1,7 @@
+*.log
+*.excel
+*.tmp
+config/.env
+.venv/
+.idea/
+trash/
