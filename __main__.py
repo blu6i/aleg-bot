@@ -8,6 +8,7 @@ from config import BOT_TOKEN
 from database import db
 from utils import log
 import handlers
+import middleware
 
 
 async def main() -> None:
@@ -33,10 +34,11 @@ async def main() -> None:
     dp.shutdown.register(on_shutdown)
 
     # Регаем мидлваеры
-    dp.message.middleware(handlers.middleware.DBMiddleware(dp["pool"]))
+    dp.message.middleware(middleware.DBMiddleware(dp["pool"]))
 
     # Регам роуторы
-
+    dp.include_router(handlers.add_alience.router)
+    dp.include_router(handlers.print_info.router)
 
     await dp.start_polling(bot, handle_as_tasks=False)
 
