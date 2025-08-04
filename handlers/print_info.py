@@ -11,7 +11,7 @@ router = Router()
                 Command("my_alliance"))
 async def show_all_alliance(msg: Message, pool: asyncpg.pool, **kwargs):
     tg_id = msg.from_user.id
-    alliances = await get_info.get_player_alliances(pool, tg_id)
+    alliances = await get_info.get_alliances_by_master(pool, tg_id)
 
     if not alliances:
         await msg.answer("У тебя пока нет гильдий.")

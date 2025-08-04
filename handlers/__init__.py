@@ -1,1 +1,1 @@
-from . import add_alience, print_info
+from . import add_alience, print_info, upd_alliance

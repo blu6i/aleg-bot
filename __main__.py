@@ -39,6 +39,7 @@ async def main() -> None:
     # Регам роуторы
     dp.include_router(handlers.add_alience.router)
     dp.include_router(handlers.print_info.router)
+    dp.include_router(handlers.upd_alliance.router)
 
     await dp.start_polling(bot, handle_as_tasks=False)
 
