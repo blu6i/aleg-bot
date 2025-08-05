@@ -5,6 +5,7 @@ async def get_alliances_by_master(pool: asyncpg.pool, tg_id: int) -> list[dict]:
         rows = await conn.fetch("""
             SELECT id, name FROM alliances
             WHERE master_id = (SELECT id FROM players WHERE tg_id = $1)
+            ORDER BY name
         """, tg_id)
 
     return [dict(row) for row in rows]
