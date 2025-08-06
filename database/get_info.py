@@ -27,3 +27,8 @@ async def get_alliance_info(pool: asyncpg.Pool, alliance_id: int) -> dict | None
     async with pool.acquire() as conn:
         row = await conn.fetchrow("SELECT id, name, chat_id FROM alliances WHERE id = $1", alliance_id)
         return dict(row) if row else None
+
+async def get_alliance_name(pool: asyncpg.Pool, alliance_id: int) -> str:
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow("SELECT name FROM alliances WHERE id = $1", alliance_id)
+        return row["name"] if row else None

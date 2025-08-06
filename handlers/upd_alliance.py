@@ -8,6 +8,7 @@ from aiogram.fsm.state import StatesGroup, State, default_state
 import asyncpg
 from database import upd_info, get_info
 
+
 class UpdInfoAlliance(StatesGroup):
     upd_alliances_list = State()
     upd_alliances_menu = State()
@@ -21,6 +22,7 @@ class UpdInfoAlliance(StatesGroup):
 
 
 router = Router()
+
 
 def build_alliance_keyboard(alliances: list[dict], page: int = 1, per_page: int = 5) -> InlineKeyboardMarkup:
     """
@@ -98,6 +100,7 @@ async def upd_alliance(msg: Message, state: FSMContext, pool: asyncpg.pool, **kw
     await msg.answer(text=text,
                      reply_markup=keyboard)
 
+
 @router.callback_query(F.data.startswith("page_"),
                        UpdInfoAlliance.upd_alliances_list)
 async def paginate_alliances(call: CallbackQuery, state: FSMContext, pool: asyncpg.pool) -> None:
@@ -119,6 +122,7 @@ async def paginate_alliances(call: CallbackQuery, state: FSMContext, pool: async
 
         await call.message.edit_reply_markup(reply_markup=keyboard)
     await call.answer()
+
 
 def build_alliance_action_keyboard(alliance_id: int, has_chat: bool) -> InlineKeyboardMarkup:
     """
@@ -160,7 +164,7 @@ async def show_alliance_actions(call: CallbackQuery, state: FSMContext, pool: as
             alliance = await get_info.get_alliance_info(pool, alliance_id)
             if not alliance:
                 return
-
+            await state.update_data(alliance_id=alliance_id)
             keyboard = build_alliance_action_keyboard(alliance_id, has_chat=bool(alliance["chat_id"]))
             await call.message.edit_text(
                 f"Выберите действие для альянса «{alliance['name']}»:",
@@ -169,6 +173,7 @@ async def show_alliance_actions(call: CallbackQuery, state: FSMContext, pool: as
             await state.set_state(UpdInfoAlliance.upd_alliances_menu)
 
     await call.answer()
+
 
 @router.callback_query(F.data == "back_to_alliances",
                        UpdInfoAlliance.upd_alliances_menu)
@@ -182,10 +187,13 @@ async def back_to_alliances(call: CallbackQuery, state: FSMContext, pool: asyncp
         await state.set_state(UpdInfoAlliance.upd_alliances_list)
     await call.answer()
 
-@router.callback_query(F.data.startswith(("edit_members_", "transfer_master_", "unlink_chat_", "link_chat_", "delete_alliance_")),
-                       UpdInfoAlliance.upd_alliances_menu)
+
+@router.callback_query(
+    F.data.startswith(("edit_members_", "transfer_master_")),
+    UpdInfoAlliance.upd_alliances_menu)
 async def placeholder_handler(call: CallbackQuery):
     await call.answer("Функция в разработке", show_alert=True)
+
 
 @router.callback_query(UpdInfoAlliance.upd_alliances_menu,
                        F.data.startswith("rename_alliance_"))
@@ -194,12 +202,18 @@ async def start_rename_alliance(call: CallbackQuery, state: FSMContext, pool: as
     if data.get("user_id") == call.from_user.id:
         alliance_id = int(int(call.data.removeprefix("rename_alliance_")))
         is_master = await get_info.is_master_of_alliance(pool=pool,
-                                                   alliance_id=alliance_id,
-                                                   tg_id=call.from_user.id)
+                                                         alliance_id=alliance_id,
+                                                         tg_id=call.from_user.id)
         if is_master:
             await state.set_state(UpdInfoAlliance.entering_rename)
             await state.update_data(alliance_id=alliance_id)
-            await call.message.edit_text(text="Введите новое название альянса")
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="Назад", callback_data="cancel_alliance_rename")]
+            ])
+            await call.message.edit_text(text="Введите новое название альянса",
+                                         reply_markup=keyboard)
+    await call.answer()
+
 
 @router.message(F.text,
                 StateFilter(UpdInfoAlliance.entering_rename, UpdInfoAlliance.confirm_rename))
@@ -217,37 +231,109 @@ async def input_alliance_name(msg: Message, state: FSMContext) -> None:
                           f"Подтвердите ввод или введите другое название",
                      reply_markup=keyboard)
 
+
 @router.callback_query(F.data == "confirm_alliance_rename",
-                UpdInfoAlliance.confirm_rename)
+                       UpdInfoAlliance.confirm_rename)
 async def confirm_alliance_rename(call: CallbackQuery, state: FSMContext, pool: asyncpg.pool) -> None:
     data = await state.get_data()
     if call.from_user.id == data["user_id"]:
         is_master = await get_info.is_master_of_alliance(pool=pool,
-                                                   alliance_id=data["alliance_id"],
-                                                   tg_id=call.from_user.id)
+                                                         alliance_id=data["alliance_id"],
+                                                         tg_id=call.from_user.id)
         if is_master:
             await upd_info.upd_alliance_name(pool, data["alliance_id"], data["new_name"])
             alliance_info = await get_info.get_alliance_info(pool=pool,
-                                                       alliance_id=data["alliance_id"])
+                                                             alliance_id=data["alliance_id"])
             keyboard = build_alliance_action_keyboard(alliance_id=data["alliance_id"],
                                                       has_chat=bool(alliance_info["chat_id"]))
             await call.message.edit_text(f"Название альянса обновлено на {data["new_name"]}",
                                          reply_markup=keyboard)
             await state.set_state(UpdInfoAlliance.upd_alliances_menu)
+    await call.answer()
+
 
 @router.callback_query(F.data == "cancel_alliance_rename",
-                       UpdInfoAlliance.confirm_rename)
+                       StateFilter(UpdInfoAlliance.confirm_rename, UpdInfoAlliance.entering_rename))
 async def cancel_alliance_rename(call: CallbackQuery, state: FSMContext, pool: asyncpg.pool) -> None:
     data = await state.get_data()
     if call.from_user.id == data["user_id"]:
         is_master = await get_info.is_master_of_alliance(pool=pool,
-                                                   alliance_id=data["alliance_id"],
-                                                   tg_id=call.from_user.id)
+                                                         alliance_id=data["alliance_id"],
+                                                         tg_id=call.from_user.id)
         if is_master:
             alliance_info = await get_info.get_alliance_info(pool=pool,
-                                                       alliance_id=data["alliance_id"])
+                                                             alliance_id=data["alliance_id"])
             keyboard = build_alliance_action_keyboard(alliance_id=data["alliance_id"],
                                                       has_chat=bool(alliance_info["chat_id"]))
             await call.message.edit_text(f"Переименование отменено.",
                                          reply_markup=keyboard)
+            await state.set_state(UpdInfoAlliance.upd_alliances_menu)
+    await call.answer()
+
+
+@router.callback_query(F.data.startswith("delete_alliance_"))
+async def start_delete_alliance(call: CallbackQuery, state: FSMContext, pool: asyncpg.pool):
+    data = await state.get_data()
+    if call.from_user.id == data.get("user_id"):
+        alliance_id = int(call.data.removeprefix("delete_alliance_"))
+        is_master = await get_info.is_master_of_alliance(pool=pool,
+                                                   alliance_id=alliance_id,
+                                                   tg_id=call.from_user.id)
+        if is_master:
+            await state.set_state(UpdInfoAlliance.delete_alliance)
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="Назад", callback_data="cancel_delete")]
+            ])
+            await call.message.edit_text("Вы уверены, что хотите удалить альянс?\n"
+                                         "Введите точное имя альянса для подтверждения:",
+                                         reply_markup=keyboard)
+    await call.answer()
+
+@router.callback_query(F.data == "cancel_delete",
+                       UpdInfoAlliance.delete_alliance)
+async def cancel_alliance_rename(call: CallbackQuery, state: FSMContext, pool: asyncpg.pool) -> None:
+    data = await state.get_data()
+    if call.from_user.id == data["user_id"]:
+        is_master = await get_info.is_master_of_alliance(pool=pool,
+                                                         alliance_id=data["alliance_id"],
+                                                         tg_id=call.from_user.id)
+        if is_master:
+            alliance_info = await get_info.get_alliance_info(pool=pool,
+                                                             alliance_id=data["alliance_id"])
+            keyboard = build_alliance_action_keyboard(alliance_id=data["alliance_id"],
+                                                      has_chat=bool(alliance_info["chat_id"]))
+            await call.message.edit_text(f"Удаление отменено.",
+                                         reply_markup=keyboard)
+            await state.set_state(UpdInfoAlliance.upd_alliances_menu)
+    await call.answer()
+
+@router.message(F.text,
+                UpdInfoAlliance.delete_alliance)
+async def confirm_delete_alliance(msg: Message, state: FSMContext, pool: asyncpg.pool):
+    data = await state.get_data()
+    alliance_name = await get_info.get_alliance_name(pool, data["alliance_id"])
+    is_master = await get_info.is_master_of_alliance(pool=pool,
+                                                     alliance_id=data["alliance_id"],
+                                                     tg_id=msg.from_user.id)
+    if is_master:
+        if msg.text.strip() == alliance_name:
+            await upd_info.delete_alliance(pool, data["alliance_id"])
+            text = "Альянс удалён."
+            alliances = await get_info.get_alliances_by_master(pool, msg.from_user.id)
+            if alliances:
+                keyboard = build_alliance_keyboard(alliances)
+                await msg.answer(text=text,
+                                 reply_markup=keyboard)
+                await state.set_state(UpdInfoAlliance.upd_alliances_list)
+            else:
+                await msg.answer(text=text)
+                await state.clear()
+        else:
+            text = "Название не совпадает. Удаление отменено."
+            alliance_info = await get_info.get_alliance_info(pool=pool,
+                                                             alliance_id=data["alliance_id"])
+            keyboard = build_alliance_action_keyboard(alliance_id=data["alliance_id"],
+                                                      has_chat=bool(alliance_info["chat_id"]))
+            await msg.answer(text=text,
+                             reply_markup=keyboard)
             await state.set_state(UpdInfoAlliance.upd_alliances_menu)
