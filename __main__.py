@@ -7,12 +7,13 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from config import BOT_TOKEN
 from database import db
 from utils import log
-import handlers
-import middleware
+from features import setup_routers
+import redis_
 
 
 async def main() -> None:
     pool = await db.connect_db()
+    rd = await redis_.config.init_redis()
     await db.postgres_version(pool)
     bot = Bot(
         token=BOT_TOKEN,
@@ -20,6 +21,7 @@ async def main() -> None:
     )
     dp = Dispatcher(storage=MemoryStorage())
     dp["pool"] = pool
+    dp["redis"] = rd
 
     async def on_startup() -> None:
         log.info("Bot start")
@@ -34,12 +36,10 @@ async def main() -> None:
     dp.shutdown.register(on_shutdown)
 
     # Регаем мидлваеры
-    dp.message.middleware(middleware.DBMiddleware(dp["pool"]))
+    # dp.message.middleware(middleware.DBMiddleware(pool=pool, redis=rd))
 
     # Регам роуторы
-    dp.include_router(handlers.add_alience.router)
-    dp.include_router(handlers.print_info.router)
-    dp.include_router(handlers.upd_alliance.router)
+    dp.include_router(setup_routers())
 
     await dp.start_polling(bot, handle_as_tasks=False)
 

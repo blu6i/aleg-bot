@@ -17,7 +17,7 @@ router = Router()
 
 @router.message(F.text,
                 Command('add_alliance'))
-async def cmd_add_alliance(msg: Message, state: FSMContext, **kwargs):
+async def cmd_add_alliance(msg: Message, state: FSMContext):
     await state.update_data(name=None)
     await state.update_data(user_id=msg.from_user.id)
     text = (f"Укажите название альянса")
@@ -27,7 +27,7 @@ async def cmd_add_alliance(msg: Message, state: FSMContext, **kwargs):
 
 @router.message(F.text,
                 AddAlliance.input_name)
-async def input_name_alliance(msg: Message, state: FSMContext, **kwargs):
+async def input_name_alliance(msg: Message, state: FSMContext):
     name = msg.text
     await state.update_data(name=name)
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
@@ -43,7 +43,9 @@ async def input_name_alliance(msg: Message, state: FSMContext, **kwargs):
 
 @router.callback_query(F.data == "create_alliance",
                        AddAlliance.input_name)
-async def create_alliance(call: CallbackQuery, state: FSMContext, pool: asyncpg.pool):
+async def create_alliance(call: CallbackQuery,
+                          state: FSMContext,
+                          pool: asyncpg.pool):
     data = await state.get_data()
     if data["user_id"] == call.from_user.id:
         name = data["name"]
