@@ -5,7 +5,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, CallbackQuery
 from redis.asyncio import Redis
 
-from database import get_info
+from database import players
 from features.filters.chat import TypeChat
 from features.filters.shared import IsAllianceMaster
 from features.filters.user import HaveRequestByUser
@@ -15,7 +15,6 @@ from .keyboards import (cancel_keyboard,
                         alliance_list_keyboard)
 from .logic import (get_alliance_list,
                     get_action_menu,
-                    rename_alliance,
                     create_bind_redis,
                     process_bind_chat,
                     process_unbind_chat, process_delete_alliance, process_alliance_rename)
@@ -62,7 +61,7 @@ async def paginate_alliances(call: CallbackQuery,
     :return: None
     """
     page = int(call.data.removeprefix("page_"))
-    alliances = await get_info.get_alliances_by_master(pool, call.from_user.id)
+    alliances = await players.get_alliances_by_master(pool, call.from_user.id)
 
     keyboard = alliance_list_keyboard(alliances, page=page)
 

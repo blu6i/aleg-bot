@@ -3,7 +3,7 @@ import json
 import asyncpg
 from redis.asyncio import Redis
 
-from database import get_info, upd_info
+from database import alliances
 from utils import log
 from .keyboards import alliance_list_keyboard, action_keyboard
 
@@ -18,16 +18,16 @@ async def get_alliance_list(pool: asyncpg.pool,
     :param custom_text:
     :return:
     """
-    alliances = await get_info.get_alliances_by_master(pool=pool,
+    alliances_data = await alliances.get_alliances_by_master(pool=pool,
                                                        tg_id=user_id)
-    if not alliances:
+    if not alliances_data:
         return None
 
     return {
         "text": (f"Выберите альянс, который нужно отредактировать\n"
                  f"\n"
                  f"{custom_text}"),
-        "keyboard": alliance_list_keyboard(alliances)
+        "keyboard": alliance_list_keyboard(alliances_data)
     }
 
 
@@ -41,7 +41,7 @@ async def get_action_menu(pool: asyncpg.pool.Pool,
     :param custom_text:
     :return:
     """
-    alliance_info = await get_info.get_alliance_info(pool=pool,
+    alliance_info = await alliances.get_alliance_info(pool=pool,
                                                      alliance_id=alliance_id)
     if not alliance_info:
         return None
@@ -65,7 +65,7 @@ async def rename_alliance(pool: asyncpg.pool.Pool,
     :param new_name:
     :return:
     """
-    await upd_info.upd_alliance_name(pool=pool,
+    await alliances.upd_alliance_name(pool=pool,
                                      alliance_id=alliance_id,
                                      new_name=new_name)
 
@@ -129,7 +129,7 @@ async def process_bind_chat(user_id: int, chat_id: int, pool: asyncpg.pool, redi
     """
     Процесс привязки чата к гильдии
     1) Пользователь вводи команду в чате
-    2) Если запись в реддис есть на добавление, то добавляет ид чат
+    2) Если запись в редис есть на добавление, то добавляет ид чат
     3) Если записи нет, то игнор (На верхнем уровне)
     :param user_id:
     :param chat_id:
@@ -150,16 +150,16 @@ async def process_bind_chat(user_id: int, chat_id: int, pool: asyncpg.pool, redi
         return False
 
 
-    if not await get_info.is_master_of_alliance(pool, tg_id=user_id, alliance_id=alliance_id):
+    if not await alliances.is_master_of_alliance(pool, tg_id=user_id, alliance_id=alliance_id):
         log.warning(f"Попытка привязать не свой альянс. tg_id: {user_id} || alliance_id: {alliance_id}")
         return False
 
-    alliance_data = await get_info.get_alliance_info(pool, alliance_id)
+    alliance_data = await alliances.get_alliance_info(pool, alliance_id)
     if alliance_data["chat_id"]:
         log.warning(f"Попытка привязать чат к альянсу, у которого он уже привязан. tg_id: {user_id} || alliance_id: {alliance_id}")
         return "У альянса уже привязан чат."
 
-    await upd_info.bind_chat_to_alliance(pool, alliance_id, chat_id)
+    await alliances.bind_chat_to_alliance(pool, alliance_id, chat_id)
     await redis.delete(redis_key)
     return True
 
@@ -172,16 +172,16 @@ async def process_unbind_chat(user_id: int, alliance_id: int, pool: asyncpg.pool
     :param pool:
     :return:
     """
-    if not await get_info.is_master_of_alliance(pool, tg_id=user_id, alliance_id=alliance_id):
+    if not await alliances.is_master_of_alliance(pool, tg_id=user_id, alliance_id=alliance_id):
         log.warning(f"Попытка отвязать чата не от своего альянса. tg_id: {user_id}, alliance_id: {alliance_id}")
         return False
 
-    alliance_data = await get_info.get_alliance_info(pool, alliance_id)
+    alliance_data = await alliances.get_alliance_info(pool, alliance_id)
     if not alliance_data["chat_id"]:
         log.warning(f"Попытка отвязать не привязанный чат к альянсу. tg_id: {user_id}, alliance_id: {alliance_id}")
         return False
 
-    await upd_info.bind_chat_to_alliance(pool, alliance_id, None)
+    await alliances.bind_chat_to_alliance(pool, alliance_id, None)
     return True
 
 
@@ -196,10 +196,10 @@ async def process_delete_alliance(user_id: int, alliance_id: int, entered_name: 
         "has_other_alliances": bool
     }
     """
-    alliance_name = await get_info.get_alliance_name(pool, alliance_id)
+    alliance_name = await alliances.get_alliance_name(pool, alliance_id)
 
     if entered_name != alliance_name:
-        alliance_info = await get_info.get_alliance_info(pool=pool, alliance_id=alliance_id)
+        alliance_info = await alliances.get_alliance_info(pool=pool, alliance_id=alliance_id)
         return {
             "success": False,
             "text": "Название не совпадает. Удаление отменено.",
@@ -209,13 +209,13 @@ async def process_delete_alliance(user_id: int, alliance_id: int, entered_name: 
             )
         }
 
-    await upd_info.delete_alliance(pool, alliance_id)
+    await alliances.delete_alliance(pool, alliance_id)
 
-    alliances = await get_info.get_alliances_by_master(pool, user_id)
+    alliances_data = await alliances.get_alliances_by_master(pool, user_id)
     return {
         "success": True,
         "text": "Альянс удалён.",
-        "keyboard": alliance_list_keyboard(alliances) if alliances else None,
+        "keyboard": alliance_list_keyboard(alliances_data) if alliances else None,
         "has_other_alliances": bool(alliances)
     }
 
