@@ -24,7 +24,7 @@ router = Router()
 
 
 # Фикс
-@router.message(Command("/my_alliances"))
+@router.message(Command("my_alliances"))
 async def upd_alliance(msg: Message, state: FSMContext, pool: asyncpg.pool, **kwargs) -> None:
     """
     Вывод списка альянса

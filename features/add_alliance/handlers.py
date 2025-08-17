@@ -6,7 +6,7 @@ from aiogram.fsm.state import StatesGroup, State
 from aiogram.types import Message, CallbackQuery
 
 from database import alliances
-from keyboards import (create_alliance_keyboard)
+from .keyboards import (create_alliance_keyboard)
 
 
 class AddAlliance(StatesGroup):
@@ -18,7 +18,7 @@ router = Router()
 
 
 @router.message(F.text,
-                Command('add_alliance'))
+                Command('create_alliance'))
 async def cmd_add_alliance(msg: Message, state: FSMContext):
     await state.update_data(name=None)
     await state.update_data(user_id=msg.from_user.id)

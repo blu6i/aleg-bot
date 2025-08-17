@@ -4,7 +4,7 @@ from aiogram.filters import BaseFilter
 from aiogram.types import Message, CallbackQuery
 from aiogram.fsm.context import FSMContext
 
-from database.get_info import is_master_of_alliance
+from database.alliances import is_master_of_alliance
 import asyncpg
 
 
